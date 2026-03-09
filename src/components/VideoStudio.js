@@ -877,12 +877,35 @@ export function VideoStudio() {
             }
 
             if (imageMode) {
-                await new Promise(resolve => setTimeout(resolve, 2500));
-                const genId = Date.now().toString();
-                lastGenerationId = genId;
-                lastGenerationModel = selectedModel;
-                addToHistory({ id: genId, url: 'https://cdn.muapi.ai/outputs/96bbb7e2df3241c5a27971726a615ef1.mp4', prompt, model: selectedModel, aspect_ratio: selectedAr, duration: selectedDuration, timestamp: new Date().toISOString() });
-                showVideoInCanvas('https://cdn.muapi.ai/outputs/96bbb7e2df3241c5a27971726a615ef1.mp4', selectedModel);
+                const i2vParams = {
+                    model: selectedModel,
+                    image_url: uploadedImageUrl,
+                };
+                if (prompt) i2vParams.prompt = prompt;
+                i2vParams.aspect_ratio = selectedAr;
+                const durations = getCurrentDurations(selectedModel);
+                if (durations.length > 0) i2vParams.duration = selectedDuration;
+                const resolutions = getCurrentResolutions(selectedModel);
+                if (resolutions.length > 0) i2vParams.resolution = selectedResolution;
+                if (selectedQuality) i2vParams.quality = selectedQuality;
+
+                const res = await muapi.generateI2V(i2vParams);
+                console.log('[VideoStudio] I2V response:', res);
+
+                if (res && res.url) {
+                    const genId = res.id || res.request_id || Date.now().toString();
+                    if (selectedModel === 'seedance-v2.0-i2v') {
+                        lastGenerationId = genId;
+                        lastGenerationModel = selectedModel;
+                    } else {
+                        lastGenerationId = null;
+                        lastGenerationModel = null;
+                    }
+                    addToHistory({ id: genId, url: res.url, prompt, model: selectedModel, aspect_ratio: selectedAr, duration: selectedDuration, timestamp: new Date().toISOString() });
+                    showVideoInCanvas(res.url, selectedModel);
+                } else {
+                    throw new Error('No video URL returned by API');
+                }
                 generateBtn.disabled = false;
                 generateBtn.innerHTML = `Generate ✨`;
                 return;
